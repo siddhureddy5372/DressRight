@@ -1,0 +1,11 @@
+<form method="POST" action="{% url 'worn' %}">
+    {% csrf_token %}
+    <div class="form-group">
+        <label for="selection">Select Yes or No:</label>
+        <select class="form-control" id="selection" name="selection">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
