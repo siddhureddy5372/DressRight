@@ -14,8 +14,3 @@ class OutfitClothes(models.Model):
     id = models.AutoField(primary_key=True)
     clothes = models.ForeignKey(ClosetClothes, on_delete=models.CASCADE)
     outfit = models.ForeignKey(Outfit, on_delete=models.CASCADE)
-
-class AllOutfits(models.Model):
-    all_outfit_id = models.AutoField(primary_key=True)
-    outfit = models.ForeignKey(Outfit,on_delete=models.CASCADE,blank= True,null= True)
-    user = models.ForeignKey(User,models.CASCADE,blank= True,null=True)

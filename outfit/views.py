@@ -1,50 +1,42 @@
-from django.shortcuts import render,redirect
-from django.shortcuts import HttpResponse
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from closet.models import ClosetClothes
-from .models import Outfit, OutfitClothes,AllOutfits
+from django.db import transaction
+from .models import Outfit
 import random
 
 def choose_random_item(category_queryset):
     if category_queryset.exists():
         eligible_items = category_queryset.filter(worn_count__lte=3)
         if eligible_items:
-            return random.choice(category_queryset)
-        else:
-            return None
-    else:
-        return None
-@login_required    
-def increment_worn_count(request):
-    if request.method == 'POST':
-        user_selection = request.POST.get('selection')
-        if user_selection == "yes":
-            try:
-                outfit = Outfit.objects.filter(user_id=request.user.id).last()
-            except Outfit.DoesNotExist:
-                return HttpResponse("Outfit not found")
+            return random.choice(eligible_items)  # Use eligible_items instead of category_queryset
+    return None
 
-            # Get all clothes associated with the outfit
-            outfit_clothes = OutfitClothes.objects.filter(outfit=outfit)
-            clothes_to_increment = [oc.clothes for oc in outfit_clothes]
 
-            # Check if any clothes exist in the queryset
-            if clothes_to_increment:
-                id_of_outfit = outfit.outfit_id
-                all_outfit = AllOutfits.objects.create(outfit_id = id_of_outfit,user_id = request.user.id)
-                for clothes in clothes_to_increment:
-                    clothes.worn_count += 1
-                    clothes.save()
-                return redirect("home")
-            else:
-                return redirect("home")
-        else:
-            return redirect("home")
-    else:
-        return redirect("home")
-    
-def count(request):
-    return render(request, "increment.html")
+def updating_items(request,new_items):
+    request.session["suggested_items"] = new_items
+
+def adding_outfits(request,ids):
+    one,two,three = ids
+    clothes1 = ClosetClothes.objects.get(clothes_id=one)
+    clothes2 = ClosetClothes.objects.get(clothes_id=two)
+    clothes3 = ClosetClothes.objects.get(clothes_id=three)
+
+    user = request.user.id
+    outfit = Outfit.objects.create(user_id=user, name='Default name')
+    outfit.clothes.add(clothes1, clothes2, clothes3)
+@login_required
+def increment(request):
+    items_ids = request.session.get('suggested_items', [])
+    suggested_items = ClosetClothes.objects.filter(user=request.user,clothes_id__in = items_ids)
+    with transaction.atomic():
+        for item in suggested_items:
+            if item is not None:
+                item.worn_count += 1
+                item.save()
+        adding_outfits(request,items_ids)
+
+    return redirect("home")
 
 
 @login_required
@@ -53,7 +45,7 @@ def suggest_outfit(request):
     weather_data = {"temperature": 0, "humidity": 80, "wind_speed": 10, "rain_chance": "heavy"}
 
     suggested_items = []
-
+    id_of_items = []
     if weather_data["temperature"] < 10:
         suggested_items.extend([
             choose_random_item(ClosetClothes.objects.filter(user=request.user, subcategory__in=['jacket', 'hoodie'])),
@@ -74,10 +66,23 @@ def suggest_outfit(request):
             choose_random_item(ClosetClothes.objects.filter(user=request.user, subcategory__in=['jeans', 'shorts', 'pants'])),
             choose_random_item(ClosetClothes.objects.filter(user=request.user, subcategory__in=['trainers', 'sneakers']))
         ])
-
     user_id = request.user.id
-    outfit = Outfit.objects.create(name= "user",user_id = user_id)
     for item in suggested_items:
-         if item is not None:
-            OutfitClothes.objects.create(clothes = item, outfit = outfit)
-    return render(request, 'home.html', {'suggested_items': suggested_items, "user":user_id})
+        if item is not None :
+            id_of_items.append(item.clothes_id)
+    updating_items(request,id_of_items)
+    suggest = request.session.get('suggested_items', [])
+    # Create OutfitClothes objects and serialize ClosetClothes instances in one go
+    '''serialized_items = []
+    user_id = request.user.id
+    outfit = Outfit.objects.create(name="user", user_id=user_id)
+
+    for item in suggested_items:
+        if item is not None and isinstance(item, ClosetClothes):
+            OutfitClothes.objects.create(clothes=item, outfit=outfit)
+            serialized_items.append(item.to_dict())
+
+    # Store the serialized items in the session
+    request.session['suggested_items'] = serialized_items
+'''
+    return render(request, 'home.html', {"outfit":suggested_items, "user": user_id,"ids":id_of_items,"suggest":suggest})

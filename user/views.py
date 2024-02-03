@@ -2,7 +2,6 @@ from django.shortcuts import render,redirect,get_object_or_404
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
 from django.contrib.auth import logout
-from outfit.models import AllOutfits,Outfit
 from closet.models import ClosetClothes
 from django.contrib.auth.decorators import login_required
 
@@ -59,8 +58,6 @@ def logout(request):
 @login_required
 def profile(request):
     user_id2 = request.user.id
-    outfits = len(AllOutfits.objects.filter(user=user_id2))
-    gen_outfits = len(Outfit.objects.filter(user=user_id2))
     clothes = len(ClosetClothes.objects.filter(user_id = user_id2))
     user = get_object_or_404(User, id=user_id2)
-    return render(request,"profile.html",{"user": user, "outfit_count":outfits,"clothes_count":clothes,"gen_outfits":gen_outfits})
+    return render(request,"profile.html",{"user": user,"clothes_count":clothes,})
